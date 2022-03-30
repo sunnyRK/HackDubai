@@ -1,29 +1,25 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract StableCoinPool is OwnableUpgradeable, ERC20Upgradeable, ReentrancyGuardUpgradeable {
+contract StableCoinPool is Ownable, ERC20, ReentrancyGuard {
 
     // ERROR-CODE
     // 1). AMT_ZERO: Amount is Zero
     // 2). INS_AMT: Insufficient amount
 
-    IERC20Upgradeable public underlyingToken;
+    IERC20 public underlyingToken;
     uint256 public totalAmount;
 
     event Deposit(address to, uint256 depositAmount, uint256 mintedShare);
     event Withdraw(address to, uint256 withdrawAmount, uint256 burnedShare);
 
-    constructor(
-        address _underlyingToken
-    ) {
-        __Ownable_init();
-        __ERC20_init("BearingToken", "bear");
-        underlyingToken = IERC20Upgradeable(_underlyingToken);
+    constructor(address _underlyingToken) ERC20("BearingToken", "bear") {
+        underlyingToken = IERC20(_underlyingToken);
     }
 
     function deposit(uint256 _amount) external nonReentrant returns(uint256 share) {
@@ -32,7 +28,7 @@ contract StableCoinPool is OwnableUpgradeable, ERC20Upgradeable, ReentrancyGuard
         underlyingToken.transferFrom(msg.sender, address(this), _amount);
 
         share = pricePerShare(_amount);
-        _mint(msg.sender, share);
+        // _mint(msg.sender, share);
 
         totalAmount = totalAmount + _amount;
         emit Deposit(msg.sender, _amount, share);
