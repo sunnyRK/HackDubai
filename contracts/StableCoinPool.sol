@@ -44,6 +44,7 @@ contract StableCoinPool is Ownable,EIP712Alien, ERC20, ReentrancyGuard {
         _limitOrderProtocol = limitOrderProtocol;
         _oneInchExchange = oneInchExchange;
     }
+    
     function deposit(uint256 _amount) external nonReentrant returns(uint256 share) {
         require(_amount > 0, "AMT_ZERO");
         
@@ -68,6 +69,34 @@ contract StableCoinPool is Ownable,EIP712Alien, ERC20, ReentrancyGuard {
         
         emit Withdraw(msg.sender, underlyingTokens, _share);
     }
+
+        /// @notice callback from limit order protocol, executes on order fill
+    function notifyFillOrder(
+        address makerAsset,
+        address takerAsset,
+        uint256 makingAmount,
+        uint256 takingAmount,
+        bytes memory interactiveData // abi.encode(orderHash)
+    ) external {
+        require(msg.sender == _limitOrderProtocol, "only LOP can exec callback");
+        makerAsset;
+        takingAmount;
+        bytes32 orderHash;
+        assembly {  // solhint-disable-line no-inline-assembly
+            orderHash := mload(add(interactiveData, 32))
+        }
+        underlyingToken = takerAsset;
+        totalAmount = IERC20(takerAsset).balanceOf(address(this));
+    }
+
+    function callFillOrder(Order memory order, bytes calldata signature,uint256 makingAmount, uint256 thresholdAmount) external {
+        require(makingAmount > 1000e18, "INS_AMT");
+        for (uint256 i=0; i<2; i++) {
+            filloreder(order, signature, makingAmount, thresholdAmount);
+        }
+    }
+
+
     function filloreder(Order memory order, bytes calldata signature,uint256 makingAmount, uint256 thresholdAmount) external returns(uint256, uint256) {
         bytes32 orderHash = _hash(order);
         uint256 takingAmount = makingAmount/takingAssetAmount; // currently it's 0.99
@@ -157,10 +186,7 @@ contract StableCoinPool is Ownable,EIP712Alien, ERC20, ReentrancyGuard {
             orderHash := mload(add(interaction, 32))
         }
 
-        Order storage _order = _orders[orderHash];
-
         require( // validate maker amount, address, asset address
-            makerAsset == _order.asset && makerAssetData.decodeUint256(_AMOUNT_INDEX) == _order.remaining &&
             makerAssetData.decodeAddress(_FROM_INDEX) == address(this) &&
             _hash(salt, makerAsset, takerAsset, makerAssetData, takerAssetData, getMakerAmount, getTakerAmount, predicate, permit, interaction) == hash,
             "bad order"
@@ -179,6 +205,77 @@ contract StableCoinPool is Ownable,EIP712Alien, ERC20, ReentrancyGuard {
 
     function underlying() public view returns(address) {
         return address(underlyingToken);
+    }
+
+    /// @notice validate signature from Limit Order Protocol, checks also asset and amount consistency
+    function isValidSignature(bytes32 hash, bytes memory signature) external view returns(bytes4) {
+        uint256 salt;
+        address makerAsset;
+        address takerAsset;
+        bytes memory makerAssetData;
+        bytes memory takerAssetData;
+        bytes memory getMakerAmount;
+        bytes memory getTakerAmount;
+        bytes memory predicate;
+        bytes memory permit;
+        bytes memory interaction;
+
+        assembly {  // solhint-disable-line no-inline-assembly
+            salt := mload(add(signature, 0x40))
+            makerAsset := mload(add(signature, 0x60))
+            takerAsset := mload(add(signature, 0x80))
+            makerAssetData := add(add(signature, 0x40), mload(add(signature, 0xA0)))
+            takerAssetData := add(add(signature, 0x40), mload(add(signature, 0xC0)))
+            getMakerAmount := add(add(signature, 0x40), mload(add(signature, 0xE0)))
+            getTakerAmount := add(add(signature, 0x40), mload(add(signature, 0x100)))
+            predicate := add(add(signature, 0x40), mload(add(signature, 0x120)))
+            permit := add(add(signature, 0x40), mload(add(signature, 0x140)))
+            interaction := add(add(signature, 0x40), mload(add(signature, 0x160)))
+        }
+        bytes32 orderHash;
+        assembly {  // solhint-disable-line no-inline-assembly
+            orderHash := mload(add(interaction, 32))
+        }
+
+        require( // validate maker amount, address, asset address
+            makerAssetData.decodeAddress(_FROM_INDEX) == address(this) &&
+            _hash(salt, makerAsset, takerAsset, makerAssetData, takerAssetData, getMakerAmount, getTakerAmount, predicate, permit, interaction) == hash,
+            "bad order"
+        );
+
+
+        return this.isValidSignature.selector;
+    }
+
+    function _hash(
+        uint256 salt,
+        address makerAsset,
+        address takerAsset,
+        bytes memory makerAssetData,
+        bytes memory takerAssetData,
+        bytes memory getMakerAmount,
+        bytes memory getTakerAmount,
+        bytes memory predicate,
+        bytes memory permit,
+        bytes memory interaction
+    ) internal view returns(bytes32) {
+        return _hashTypedDataV4(
+            keccak256(
+                abi.encode(
+                    LIMIT_ORDER_TYPEHASH,
+                    salt,
+                    makerAsset,
+                    takerAsset,
+                    keccak256(makerAssetData),
+                    keccak256(takerAssetData),
+                    keccak256(getMakerAmount),
+                    keccak256(getTakerAmount),
+                    keccak256(predicate),
+                    keccak256(permit),
+                    keccak256(interaction)
+                )
+            )
+        );
     }
 
 }
