@@ -1,15 +1,31 @@
-# Basic Sample Hardhat Project
+# stableAPY
+Automated market making strategy for stablecoins using the 1inch Limit Order Protocol
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
+## Installation
 
-Try running some of the following tasks:
+Clone the repository
 
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-node scripts/sample-script.js
-npx hardhat help
+```bash
+$ git clone https://github.com/sunnyRK/HackDubai
+$ cd HackDubai
 ```
+
+```bash
+$ yarn start # to start a development
+$ yarn build # to create a production build
+```
+
+## How it works
+user depoist DAI in to the contract, and get leverage bearing token, stableAPY use 1inch limit order and create two order 
+1. swap dai with USDC where taking amount is 0.99 USDC(arbitrary number). 
+2. swap USDC with dai where taking amount is 0.99 DAI (rbitrary number). 
+we can do this multiple time in loop 
+
+## example
+1000 dai in pool 
+using 1inch limit order we create order buy usdc 1dai = 0.99usdc 
+there for balance is 1010USDC
+then we put another order will be 1 USDC == 0.99 DAI 
+therefor balance is 1020
+we autometed this infinity time.
+
